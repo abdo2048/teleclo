@@ -1,0 +1,7 @@
+﻿a[build]
+  # No build step; this is a pure static site.
+  command = ""
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
