@@ -1,4 +1,4 @@
-﻿// netlify/functions/posts.mjs
+// netlify/functions/posts.mjs
 
 // In-memory store: reset randomly when function goes cold.
 // Good enough for a testing/demo instance, NOT for production.

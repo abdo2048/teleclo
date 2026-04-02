@@ -1,5 +1,4 @@
-﻿a[build]
-  # No build step; this is a pure static site.
+[build]
   command = ""
   publish = "."
 
