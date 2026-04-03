@@ -69,7 +69,6 @@ class MemoryStorage {
   }
 }
 
-export const storage = new MemoryStorage();
 
 // Single shared instance so state persists across invocations on warm lambdas
 export const storage = new MemoryStorage();
