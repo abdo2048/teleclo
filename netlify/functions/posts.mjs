@@ -1,27 +1,21 @@
 // netlify/functions/posts.mjs
 
-// In-memory store: reset randomly when function goes cold.
-// Good enough for a testing/demo instance, NOT for production.
-const posts = new Map();
+import { storage } from "./storage.mjs";
 
-// Small helper to create JSON responses
 const json = (status, data) =>
   new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      // Basic privacy: disable caching of API responses
+      // Do not cache API responses; keeps behavior simple and privacy-friendly
       "Cache-Control": "no-store"
     }
   });
 
-// Generate a simple random id
-const randomId = () =>
-  Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
 export default async (request, context) => {
   const { method } = request;
 
+  // CORS preflight (kept minimal; you can tighten if you want)
   if (method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -33,55 +27,47 @@ export default async (request, context) => {
     });
   }
 
-  // Simple routing based on query parameters
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
 
   if (method === "GET") {
     if (id) {
-      const post = posts.get(id);
+      const post = storage.getPost(id);
       if (!post) return json(404, { error: "Post not found" });
-      return json(200, { id, ...post });
+
+      // Return full post for reader page
+      return json(200, {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        createdAt: post.createdAt
+      });
     }
 
-    // List of recent posts (lightweight list, title + createdAt)
-    const list = Array.from(posts.entries())
-      .map(([pid, post]) => ({
-        id: pid,
-        title: post.title || "(untitled)",
-        createdAt: post.createdAt
-      }))
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 50);
-
-    return json(200, { posts: list });
+    const posts = storage.listPosts(50);
+    return json(200, { posts });
   }
 
   if (method === "POST") {
-    const body = await request.json().catch(() => null);
-    if (!body || typeof body.content !== "string") {
-      return json(400, { error: "Invalid request body" });
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json(400, { error: "Invalid JSON" });
     }
 
-    const title =
-      typeof body.title === "string" && body.title.trim()
-        ? body.title.trim().slice(0, 200)
-        : "";
+    if (!body || typeof body.content !== "string" || !body.content.trim()) {
+      return json(400, { error: "Content is required" });
+    }
 
-    const id = randomId();
-    const createdAt = Date.now();
-
-    const post = {
-      title,
-      content: body.content.slice(0, 20000), // hard cap for demo
-      createdAt
-    };
-
-    posts.set(id, post);
+    const post = storage.createPost({
+      title: body.title,
+      content: body.content
+    });
 
     return json(201, {
-      id,
-      url: `/post.html?id=${encodeURIComponent(id)}`
+      id: post.id,
+      url: `/post.html?id=${encodeURIComponent(post.id)}`
     });
   }
 
