@@ -1,5 +1,4 @@
 // netlify/functions/posts.mjs
-
 import { storage } from "./storage.mjs";
 
 const json = (status, data) =>
@@ -7,7 +6,6 @@ const json = (status, data) =>
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      // Do not cache API responses; keeps behavior simple and privacy-friendly
       "Cache-Control": "no-store"
     }
   });
@@ -15,7 +13,6 @@ const json = (status, data) =>
 export default async (request, context) => {
   const { method } = request;
 
-  // CORS preflight (kept minimal; you can tighten if you want)
   if (method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -35,11 +32,11 @@ export default async (request, context) => {
       const post = storage.getPost(id);
       if (!post) return json(404, { error: "Post not found" });
 
-      // Return full post for reader page
       return json(200, {
         id: post.id,
         title: post.title,
-        content: post.content,
+        contentHtml: post.contentHtml,
+        contentText: post.contentText,
         createdAt: post.createdAt
       });
     }
@@ -56,13 +53,17 @@ export default async (request, context) => {
       return json(400, { error: "Invalid JSON" });
     }
 
-    if (!body || typeof body.content !== "string" || !body.content.trim()) {
+    const html = typeof body.contentHtml === "string" ? body.contentHtml : "";
+    const text = typeof body.contentText === "string" ? body.contentText : "";
+
+    if (!html.trim() && !text.trim()) {
       return json(400, { error: "Content is required" });
     }
 
     const post = storage.createPost({
       title: body.title,
-      content: body.content
+      contentHtml: html,
+      contentText: text
     });
 
     return json(201, {

@@ -110,7 +110,7 @@
         document.getElementById("title").textContent = data.title || "(untitled)";
         const dt = new Date(data.createdAt);
         document.getElementById("meta").textContent = dt.toLocaleString([], { hour12: false });
-        document.getElementById("content").textContent = data.content || "";
+        document.getElementById("content").innerHTML = data.contentHtml || "";
       } catch (err) {
         console.error(err);
         document.getElementById("title").textContent = "Post not found";

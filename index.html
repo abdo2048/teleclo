@@ -152,20 +152,36 @@
       <p>Minimal, anonymous publishing. No trackers.</p>
     </header>
 
-    <form id="post-form" autocomplete="off" novalidate>
-      <div class="row">
-        <label for="title">Title (optional)</label>
-        <input id="title" name="title" type="text" maxlength="200" placeholder="Type a title or leave empty">
-      </div>
-      <div class="row">
-        <label for="content">Content</label>
-        <textarea id="content" name="content" required placeholder="Start writing…"></textarea>
-      </div>
-      <div class="actions">
-        <button type="submit" id="submit-btn">Publish</button>
-        <span class="status" id="status"></span>
-      </div>
-    </form>
+<form id="post-form" autocomplete="off" novalidate>
+  <div class="row">
+    <label for="title">Title (optional)</label>
+    <input id="title" name="title" type="text" maxlength="200" placeholder="Type a title or leave empty">
+  </div>
+
+  <div class="row">
+    <label>Content</label>
+    <div id="toolbar" aria-label="Formatting toolbar">
+      <button type="button" data-cmd="bold"><strong>B</strong></button>
+      <button type="button" data-cmd="italic"><em>I</em></button>
+      <button type="button" data-heading="h2">H2</button>
+      <button type="button" data-heading="h3">H3</button>
+      <button type="button" data-cmd="insertUnorderedList">• List</button>
+      <button type="button" data-cmd="formatBlock" data-value="blockquote">“Quote”</button>
+    </div>
+    <div id="editor"
+         contenteditable="true"
+         aria-label="Post content"
+         spellcheck="true"></div>
+
+    <!-- Hidden plain-text version for storage/search -->
+    <textarea id="content-text" name="content-text" hidden></textarea>
+  </div>
+
+  <div class="actions">
+    <button type="submit" id="submit-btn">Publish</button>
+    <span class="status" id="status"></span>
+  </div>
+</form>
 
     <section class="posts-list">
       <h2>Recent posts (this instance)</h2>
@@ -174,80 +190,112 @@
   </div>
 
   <script>
-    // Helper: small wrapper around fetch for our API
-    async function api(path, options) {
-      const res = await fetch(path, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          ...(options && options.headers)
-        },
-        cache: "no-store",
-        credentials: "same-origin"
-      });
+  function api(path, options) {
+    return fetch(path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        ...(options && options.headers)
+      },
+      cache: "no-store",
+      credentials: "same-origin"
+    }).then(async (res) => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Request failed");
       return data;
+    });
+  }
+
+  const form = document.getElementById("post-form");
+  const statusEl = document.getElementById("status");
+  const submitBtn = document.getElementById("submit-btn");
+  const postsList = document.getElementById("posts");
+  const editor = document.getElementById("editor");
+  const contentText = document.getElementById("content-text");
+
+  // Toolbar behavior (simple, small)
+  document.getElementById("toolbar").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    e.preventDefault();
+    const cmd = btn.dataset.cmd;
+    const heading = btn.dataset.heading;
+    if (heading) {
+      document.execCommand("formatBlock", false, heading);
+      return;
+    }
+    if (cmd === "formatBlock") {
+      const value = btn.dataset.value || "p";
+      document.execCommand("formatBlock", false, value);
+      return;
+    }
+    if (cmd) {
+      document.execCommand(cmd, false, null);
+    }
+    editor.focus();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = document.getElementById("title").value.trim();
+    const html = editor.innerHTML.trim();
+    const text = editor.textContent.trim();
+
+    if (!html && !text) {
+      statusEl.textContent = "Content is required.";
+      return;
     }
 
-    const form = document.getElementById("post-form");
-    const statusEl = document.getElementById("status");
-    const submitBtn = document.getElementById("submit-btn");
-    const postsList = document.getElementById("posts");
+    contentText.value = text;
+    submitBtn.disabled = true;
+    statusEl.textContent = "Publishing…";
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const title = document.getElementById("title").value.trim();
-      const content = document.getElementById("content").value.trim();
-      if (!content) {
-        statusEl.textContent = "Content is required.";
+    try {
+      const data = await api("/.netlify/functions/posts", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          contentHtml: html,
+          contentText: text
+        })
+      });
+      statusEl.textContent = "Published. Redirecting…";
+      window.location.href = data.url;
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = err.message || "Failed to publish.";
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  async function loadPosts() {
+    try {
+      const data = await api("/.netlify/functions/posts", { method: "GET" });
+      postsList.innerHTML = "";
+      if (!data.posts || !data.posts.length) {
+        postsList.innerHTML = "<li>No posts yet on this instance.</li>";
         return;
       }
-      submitBtn.disabled = true;
-      statusEl.textContent = "Publishing…";
-
-      try {
-        const data = await api("/.netlify/functions/posts", {
-          method: "POST",
-          body: JSON.stringify({ title, content })
-        });
-        statusEl.textContent = "Published. Redirecting…";
-        window.location.href = data.url;
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = err.message || "Failed to publish.";
-      } finally {
-        submitBtn.disabled = false;
+      for (const post of data.posts) {
+        const li = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = "/post.html?id=" + encodeURIComponent(post.id);
+        link.textContent = post.title || "(untitled)";
+        const time = document.createElement("time");
+        const dt = new Date(post.createdAt);
+        time.textContent = dt.toLocaleString([], { hour12: false });
+        li.appendChild(link);
+        li.appendChild(time);
+        postsList.appendChild(li);
       }
-    });
-
-    async function loadPosts() {
-      try {
-        const data = await api("/.netlify/functions/posts", { method: "GET" });
-        postsList.innerHTML = "";
-        if (!data.posts || !data.posts.length) {
-          postsList.innerHTML = "<li>No posts yet on this instance.</li>";
-          return;
-        }
-        for (const post of data.posts) {
-          const li = document.createElement("li");
-          const link = document.createElement("a");
-          link.href = "/post.html?id=" + encodeURIComponent(post.id);
-          link.textContent = post.title || "(untitled)";
-          const time = document.createElement("time");
-          const dt = new Date(post.createdAt);
-          time.textContent = dt.toLocaleString([], { hour12: false });
-          li.appendChild(link);
-          li.appendChild(time);
-          postsList.appendChild(li);
-        }
-      } catch (err) {
-        console.error(err);
-        postsList.innerHTML = "<li>Failed to load posts.</li>";
-      }
+    } catch (err) {
+      console.error(err);
+      postsList.innerHTML = "<li>Failed to load posts.</li>";
     }
+  }
 
-    loadPosts();
-  </script>
+  loadPosts();
+</script>
 </body>
 </html>

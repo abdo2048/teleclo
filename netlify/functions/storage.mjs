@@ -13,6 +13,7 @@
  * For now it's in-memory; later we can add other adapters.
  */
 
+
 const clampString = (value, max) => {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
@@ -25,7 +26,6 @@ class MemoryStorage {
     this.posts = new Map();
   }
 
-  // Simple random ID (not cryptographically secure, fine for demo)
   _newId() {
     return (
       Math.random().toString(36).slice(2, 10) +
@@ -33,17 +33,19 @@ class MemoryStorage {
     );
   }
 
-  createPost({ title, content }) {
+  createPost({ title, contentHtml, contentText }) {
     const id = this._newId();
     const createdAt = Date.now();
 
     const safeTitle = clampString(title, 200);
-    const safeContent = clampString(content, 20000);
+    const safeHtml = clampString(contentHtml, 20000);
+    const safeText = clampString(contentText, 20000);
 
     const post = {
       id,
       title: safeTitle,
-      content: safeContent,
+      contentHtml: safeHtml,
+      contentText: safeText,
       createdAt
     };
 
@@ -66,6 +68,8 @@ class MemoryStorage {
     }));
   }
 }
+
+export const storage = new MemoryStorage();
 
 // Single shared instance so state persists across invocations on warm lambdas
 export const storage = new MemoryStorage();
