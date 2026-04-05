@@ -1,4 +1,5 @@
 import { MemoryStorage } from './memory.js';
+import { UserIsolatedStorage } from './user-isolated-storage.js';
 
 /**
  * Creates and returns the appropriate storage instance based on environment/config
@@ -11,6 +12,9 @@ export function createStorage() {
   switch (storageType) {
     case 'memory':
       return new MemoryStorage();
+    
+    case 'user-isolated':
+      return new UserIsolatedStorage();
     
     // Additional cases would be added for other storage types:
     // case 'file':
@@ -29,3 +33,4 @@ export function createStorage() {
 
 // Export for direct use when needed
 export { MemoryStorage } from './memory.js';
+export { UserIsolatedStorage } from './user-isolated-storage.js';
