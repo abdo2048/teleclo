@@ -10,7 +10,6 @@ A privacy-respecting, fast-loading telegraph-like publishing platform. This is a
 - **Modular architecture**: Pluggable storage backends
 - **Hybrid editor**: WYSIWYG + Markdown editor with real-time preview
 - **Internationalization**: Full LTR/RTL support
-- **Temporary instances**: Optional 12-hour auto-reset for demo instances
 
 ## Architecture
 
@@ -18,7 +17,6 @@ The project follows a modular architecture with clear separation of concerns:
 
 - **Domain Layer** (`src/domain/`): Business logic and data validation
 - **Storage Layer** (`src/storage/`): Pluggable storage implementations
-- **Instance Layer** (`src/instance/`): Temporary instance management
 - **Editor Layer** (`src/editor/`): Rich text editor functionality
 - **API Layer** (`netlify/functions/`): Serverless functions
 - **Presentation Layer** (`public/`): HTML, CSS, and client-side JavaScript
@@ -56,29 +54,44 @@ The project follows a modular architecture with clear separation of concerns:
 
 ## Storage Configuration
 
-By default, the application uses in-memory storage which is suitable for demo instances. For production deployments, you can configure different storage backends:
+The platform supports different storage configurations depending on your use case:
 
-- **In-Memory** (default): Data resets periodically, suitable for demo/testing
-- **File-based**: Stores data in JSON files
-- **Database**: Connect to PostgreSQL, MySQL, etc.
-- **Git-based**: Store posts in a Git repository
-
-Set the `STORAGE_TYPE` environment variable to choose your storage backend:
+### Demo Instance (Shared)
+By default, the application uses in-memory storage which shares content among all users. This is suitable for demo purposes:
 
 ```env
-STORAGE_TYPE=memory    # Default, for demos
-STORAGE_TYPE=file      # File-based storage
-STORAGE_TYPE=database  # Database storage
+STORAGE_TYPE=memory
 ```
 
-## Temporary Instances
-
-For demo purposes, the platform supports temporary instances that automatically reset after 12 hours. This ensures a clean, private experience for users trying the platform. To enable this feature:
+### Personal Blog Instance
+For a personal blog where you want persistent content, configure a database:
 
 ```env
-ENABLE_TEMP_INSTANCES=true
-TEMP_INSTANCE_TTL=43200000  # 12 hours in milliseconds
+STORAGE_TYPE=database
+DATABASE_URL=your_database_connection_string
 ```
+
+## Understanding Instance Types
+
+Due to the nature of serverless functions (Netlify Functions, Vercel API Routes), true temporary instances with per-user isolation are challenging to implement because:
+
+1. Serverless functions don't maintain persistent state between requests
+2. Function instances are recycled unpredictably
+3. There's no guaranteed cleanup process
+
+### Available Options
+
+#### Public Demo Instance
+- All users share the same content space
+- Content persists only as long as the function instance remains "warm"
+- Best for trying out the platform functionality
+
+#### Personal/Private Instance (Recommended for actual use)
+- Requires a database for persistent content
+- Supports proper content ownership and management
+- Suitable for personal blogs
+
+See [Architecture Guide](docs/architecture.md) for detailed information about storage options and implementation details.
 
 ## Editor Features
 
