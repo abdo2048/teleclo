@@ -2,7 +2,7 @@
 <html lang="en" dir="auto">
 <head>
   <meta charset="utf-8">
-  <title>Telegraph-lite · New Post</title>
+  <title>Telegraph-like Platform · New Post</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -53,17 +53,24 @@
       font-size: .9rem;
       color: var(--fg-muted);
     }
-    form {
+    .editor-container {
       border: 1px solid var(--border);
       border-radius: .75rem;
       padding: 1rem;
       background: rgba(255,255,255,0.8);
       backdrop-filter: blur(6px);
+      margin-bottom: 1rem;
     }
     @media (prefers-color-scheme: dark) {
-      form {
+      .editor-container {
         background: rgba(15,23,42,0.9);
       }
+    }
+    .row {
+      margin-bottom: .75rem;
+    }
+    .form-group {
+      margin-bottom: 1rem;
     }
     label {
       display: block;
@@ -71,7 +78,7 @@
       font-weight: 500;
       margin-bottom: .25rem;
     }
-    input[type="text"], textarea {
+    input[type="text"] {
       width: 100%;
       border-radius: .5rem;
       border: 1px solid var(--border);
@@ -79,18 +86,11 @@
       font: inherit;
       color: inherit;
       background: transparent;
-      resize: vertical;
     }
-    textarea {
-      min-height: 200px;
-    }
-    input:focus, textarea:focus {
+    input:focus {
       outline: 2px solid var(--accent);
       outline-offset: 1px;
       border-color: transparent;
-    }
-    .row {
-      margin-bottom: .75rem;
     }
     .actions {
       display: flex;
@@ -143,159 +143,133 @@
       color: var(--fg-muted);
       white-space: nowrap;
     }
+    
+    /* RTL support */
+    [dir="rtl"] {
+      text-align: right;
+    }
   </style>
+  <link rel="stylesheet" href="./public/css/editor.css">
 </head>
 <body>
   <div class="page">
     <header>
-      <h1>Telegraph-lite</h1>
-      <p>Minimal, anonymous publishing. No trackers.</p>
+      <h1>Telegraph-like Platform</h1>
+      <p>Privacy-focused, fast publishing. No trackers.</p>
     </header>
 
-<form id="post-form" autocomplete="off" novalidate>
-  <div class="row">
-    <label for="title">Title (optional)</label>
-    <input id="title" name="title" type="text" maxlength="200" placeholder="Type a title or leave empty">
-  </div>
-
-  <div class="row">
-    <label>Content</label>
-    <div id="toolbar" aria-label="Formatting toolbar">
-      <button type="button" data-cmd="bold"><strong>B</strong></button>
-      <button type="button" data-cmd="italic"><em>I</em></button>
-      <button type="button" data-heading="h2">H2</button>
-      <button type="button" data-heading="h3">H3</button>
-      <button type="button" data-cmd="insertUnorderedList">• List</button>
-      <button type="button" data-cmd="formatBlock" data-value="blockquote">“Quote”</button>
-    </div>
-    <div id="editor"
-         contenteditable="true"
-         aria-label="Post content"
-         spellcheck="true"></div>
-
-    <!-- Hidden plain-text version for storage/search -->
-    <textarea id="content-text" name="content-text" hidden></textarea>
-  </div>
-
-  <div class="actions">
-    <button type="submit" id="submit-btn">Publish</button>
-    <span class="status" id="status"></span>
-  </div>
-</form>
+    <form id="post-form" autocomplete="off" novalidate>
+      <div class="form-group">
+        <label for="title">Title (optional)</label>
+        <input id="title" name="title" type="text" maxlength="200" placeholder="Type a title or leave empty">
+      </div>
+      
+      <div class="form-group">
+        <label>Content</label>
+        <div id="editor-container" class="editor-container"></div>
+      </div>
+      
+      <div class="actions">
+        <button type="submit" id="submit-btn">Publish</button>
+        <span class="status" id="status"></span>
+      </div>
+    </form>
 
     <section class="posts-list">
-      <h2>Recent posts (this instance)</h2>
+      <h2>Recent posts (on this instance)</h2>
       <ul id="posts"></ul>
     </section>
   </div>
 
-  <script>
-  function api(path, options) {
-    return fetch(path, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        ...(options && options.headers)
-      },
-      cache: "no-store",
-      credentials: "same-origin"
-    }).then(async (res) => {
+  <script type="module">
+    import { HybridEditor } from './src/editor/hybrid-editor.js';
+    
+    // Initialize the hybrid editor
+    const editorContainer = document.getElementById('editor-container');
+    const editor = new HybridEditor(editorContainer, {
+      enableMarkdownPreview: true,
+      enableWysiwyg: true
+    });
+    
+    // Helper: small wrapper around fetch for our API
+    async function api(path, options) {
+      const res = await fetch(path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          ...(options && options.headers)
+        },
+        cache: "no-store",
+        credentials: "same-origin"
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Request failed");
       return data;
-    });
-  }
-
-  const form = document.getElementById("post-form");
-  const statusEl = document.getElementById("status");
-  const submitBtn = document.getElementById("submit-btn");
-  const postsList = document.getElementById("posts");
-  const editor = document.getElementById("editor");
-  const contentText = document.getElementById("content-text");
-
-  // Toolbar behavior (simple, small)
-  document.getElementById("toolbar").addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    e.preventDefault();
-    const cmd = btn.dataset.cmd;
-    const heading = btn.dataset.heading;
-    if (heading) {
-      document.execCommand("formatBlock", false, heading);
-      return;
-    }
-    if (cmd === "formatBlock") {
-      const value = btn.dataset.value || "p";
-      document.execCommand("formatBlock", false, value);
-      return;
-    }
-    if (cmd) {
-      document.execCommand(cmd, false, null);
-    }
-    editor.focus();
-  });
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const title = document.getElementById("title").value.trim();
-    const html = editor.innerHTML.trim();
-    const text = editor.textContent.trim();
-
-    if (!html && !text) {
-      statusEl.textContent = "Content is required.";
-      return;
     }
 
-    contentText.value = text;
-    submitBtn.disabled = true;
-    statusEl.textContent = "Publishing…";
+    const form = document.getElementById("post-form");
+    const statusEl = document.getElementById("status");
+    const submitBtn = document.getElementById("submit-btn");
+    const postsList = document.getElementById("posts");
 
-    try {
-      const data = await api("/.netlify/functions/posts", {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          contentHtml: html,
-          contentText: text
-        })
-      });
-      statusEl.textContent = "Published. Redirecting…";
-      window.location.href = data.url;
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent = err.message || "Failed to publish.";
-    } finally {
-      submitBtn.disabled = false;
-    }
-  });
-
-  async function loadPosts() {
-    try {
-      const data = await api("/.netlify/functions/posts", { method: "GET" });
-      postsList.innerHTML = "";
-      if (!data.posts || !data.posts.length) {
-        postsList.innerHTML = "<li>No posts yet on this instance.</li>";
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = document.getElementById("title").value.trim();
+      
+      const content = editor.getContent();
+      if (!content.text.trim()) {
+        statusEl.textContent = "Content is required.";
         return;
       }
-      for (const post of data.posts) {
-        const li = document.createElement("li");
-        const link = document.createElement("a");
-        link.href = "/post.html?id=" + encodeURIComponent(post.id);
-        link.textContent = post.title || "(untitled)";
-        const time = document.createElement("time");
-        const dt = new Date(post.createdAt);
-        time.textContent = dt.toLocaleString([], { hour12: false });
-        li.appendChild(link);
-        li.appendChild(time);
-        postsList.appendChild(li);
-      }
-    } catch (err) {
-      console.error(err);
-      postsList.innerHTML = "<li>Failed to load posts.</li>";
-    }
-  }
+      submitBtn.disabled = true;
+      statusEl.textContent = "Publishing…";
 
-  loadPosts();
-</script>
+      try {
+        const data = await api("/.netlify/functions/posts", {
+          method: "POST",
+          body: JSON.stringify({ 
+            title, 
+            contentHtml: content.html,
+            contentText: content.text
+          })
+        });
+        statusEl.textContent = "Published. Redirecting…";
+        window.location.href = data.url;
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = err.message || "Failed to publish.";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    async function loadPosts() {
+      try {
+        const data = await api("/.netlify/functions/posts", { method: "GET" });
+        postsList.innerHTML = "";
+        if (!data.posts || !data.posts.length) {
+          postsList.innerHTML = "<li>No posts yet on this instance.</li>";
+          return;
+        }
+        for (const post of data.posts) {
+          const li = document.createElement("li");
+          const link = document.createElement("a");
+          link.href = "/post.html?id=" + encodeURIComponent(post.id);
+          link.textContent = post.title || "(untitled)";
+          const time = document.createElement("time");
+          const dt = new Date(post.createdAt);
+          time.textContent = dt.toLocaleString([], { hour12: false });
+          li.appendChild(link);
+          li.appendChild(time);
+          postsList.appendChild(li);
+        }
+      } catch (err) {
+        console.error(err);
+        postsList.innerHTML = "<li>Failed to load posts.</li>";
+      }
+    }
+
+    loadPosts();
+  </script>
 </body>
 </html>

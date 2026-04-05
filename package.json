@@ -1,0 +1,29 @@
+{
+  "name": "telegraph-copy",
+  "version": "1.0.0",
+  "description": "A privacy-respecting, fast-loading telegraph-like publishing platform",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'Build completed'",
+    "test": "node ./tests/storage.test.js",
+    "lint": "echo 'Linting coming soon...'"
+  },
+  "keywords": [
+    "telegraph",
+    "publishing",
+    "jamstack",
+    "privacy",
+    "netlify",
+    "vercel"
+  ],
+  "author": "Open Source Community",
+  "license": "MIT",
+  "devDependencies": {
+    "@netlify/functions": "^2.8.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

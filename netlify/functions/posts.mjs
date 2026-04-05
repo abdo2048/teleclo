@@ -1,5 +1,11 @@
 // netlify/functions/posts.mjs
-import { storage } from "./storage.mjs";
+import { createStorage } from '../../src/storage/factory.js';
+import { getInstanceManager } from '../../src/instance/temp-instance-manager.js';
+
+// For demo purposes, we'll use a single storage instance
+// In a real implementation with per-client storage, we'd use the instance manager
+const storage = createStorage();
+const instanceManager = getInstanceManager({ ttl: 12 * 60 * 60 * 1000 }); // 12 hours
 
 const json = (status, data) =>
   new Response(JSON.stringify(data), {
@@ -24,12 +30,16 @@ export default async (request, context) => {
     });
   }
 
+  // For demo purposes, we'll continue using the single storage
+  // In a real implementation, we'd get the client-specific storage like:
+  // const clientStorage = instanceManager.getInstance(instanceManager.getClientIdFromRequest(request));
+  
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
 
   if (method === "GET") {
     if (id) {
-      const post = storage.getPost(id);
+      const post = await storage.getPost(id);
       if (!post) return json(404, { error: "Post not found" });
 
       return json(200, {
@@ -41,7 +51,7 @@ export default async (request, context) => {
       });
     }
 
-    const posts = storage.listPosts(50);
+    const posts = await storage.listPosts(50);
     return json(200, { posts });
   }
 
@@ -60,16 +70,20 @@ export default async (request, context) => {
       return json(400, { error: "Content is required" });
     }
 
-    const post = storage.createPost({
-      title: body.title,
-      contentHtml: html,
-      contentText: text
-    });
+    try {
+      const post = await storage.createPost({
+        title: body.title,
+        contentHtml: html,
+        contentText: text
+      });
 
-    return json(201, {
-      id: post.id,
-      url: `/post.html?id=${encodeURIComponent(post.id)}`
-    });
+      return json(201, {
+        id: post.id,
+        url: `/post.html?id=${encodeURIComponent(post.id)}`
+      });
+    } catch (error) {
+      return json(400, { error: error.message });
+    }
   }
 
   return json(405, { error: "Method not allowed" });
