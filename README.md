@@ -1,4 +1,3 @@
-# Warning: This is not a thing to be taken seriously. It's just playing.
 # Telegraph-like Platform
 
 A privacy-respecting, fast-loading telegraph-like publishing platform. This is an open-source alternative to telegra.ph that anyone can host with a single click on Netlify, Vercel, or other platforms.

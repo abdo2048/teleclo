@@ -1,5 +1,6 @@
 import { MemoryStorage } from './memory.js';
 import { UserIsolatedStorage } from './user-isolated-storage.js';
+import { DBStorage } from './db-storage.js';
 
 /**
  * Creates and returns the appropriate storage instance based on environment/config
@@ -16,14 +17,17 @@ export function createStorage() {
     case 'user-isolated':
       return new UserIsolatedStorage();
     
+    case 'database':
+    case 'db':
+      // For DB storage, we need Supabase credentials
+      return new DBStorage(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_KEY
+      );
+    
     // Additional cases would be added for other storage types:
     // case 'file':
     //   return new FileStorage(process.env.FILE_STORAGE_PATH || './data');
-    // 
-    // case 'database':
-    //   return new DatabaseStorage({
-    //     connectionString: process.env.DATABASE_URL
-    //   });
     
     default:
       console.warn(`Unknown storage type: ${storageType}, falling back to memory storage`);
@@ -34,3 +38,4 @@ export function createStorage() {
 // Export for direct use when needed
 export { MemoryStorage } from './memory.js';
 export { UserIsolatedStorage } from './user-isolated-storage.js';
+export { DBStorage } from './db-storage.js';
