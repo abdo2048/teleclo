@@ -96,7 +96,7 @@ export class DBStorage extends StorageInterface {
     const { data, error } = await this.supabase
       .from('posts')
       .select('*')
-      .eq('id', id')
+      .eq('id', id)
       .single();
     
     if (error) {
